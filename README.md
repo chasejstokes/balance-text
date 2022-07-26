@@ -6,7 +6,7 @@ _Bridget Cogley ([hwinds@gmail.com](mailto:hwinds@gmail.com))_<br>
 _Arvind Satyanarayan ([arvindsatya@mit.edu](mailto:arvindsatya@mit.edu))_<br>
 _Marti Hearst ([hearst@berkeley.edu](mailto:hearst@berkeley.edu))_<br>
 
-This repository contains supplementary materials for _Under- and Over-Texting in Charts: Exploring the Effect of Quantity and Content on Reader Preferences and Takeaways_.
+This repository contains supplementary materials for _Striking a Balance: Reader Takeaways and Preferences when Integrating Text and Charts_.
 
 ## Repository contents
 
