@@ -10,5 +10,8 @@ This repository contains supplementary materials for _Under- and Over-Texting in
 
 ## Repository contents
 
-- R/: R files used in the analyses
-- data/: Data used in the analyses
+* [survey.pdf](survey.pdf): Example survey as taken by participants.
+* [analysis.md](analysis.md): Description of analyses from our paper using R code and associated output.
+* [replicabilitystamp/](replicabilitystamp/): Files submitted for the [Replicability Stamp](http://www.replicabilitystamp.org/requirements.html)
+* [data/](data/): Data used in the analyses
+* [survey-analysis.rmd](survey-analysis.rmd): R code used for the analyses in the documents above
