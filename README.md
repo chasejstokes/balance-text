@@ -1,4 +1,4 @@
-# Data and code for _Under- and Over-Texting in Charts: Exploring the Effect of Quantity and Content on Reader Preferences and Takeaways_
+# Data and code for _Striking a Balance: Reader Takeaways and Preferences when Integrating Text and Charts_
 
 _Chase Stokes ([cstokes@ischool.berkeley.edu](mailto:cstokes@ischool.berkeley.edu))_<br>
 _Vidya Setlur ([vsetlur@tableau.com](mailto:vsetlur@tableau.com))_<br>
