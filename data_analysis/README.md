@@ -4,7 +4,7 @@ This directory contains supplementary materials for _Striking a Balance: Reader 
 
 ## Directory contents
 
-* [balanceText.rmd](balanceText.rmd): RStudio file containing analysis of the data for this project. 
+* [balanceText.Rmd](balanceText.Rmd): RStudio file containing analysis of the data for this project. 
 * [balanceText.csv](balanceText.csv): All data collected from the survey. 
 * [annotationInformation.csv](annotationInformation.csv): Metadata regarding the annotations on the charts shown in the survey, including the position of the annotation.
 * [takeaways_coded.csv](takeaways_coded.csv): Data regarding participant takeaways, including codes agreed upon by paper authors.
