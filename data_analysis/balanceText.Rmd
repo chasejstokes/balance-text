@@ -1,0 +1,956 @@
+---
+title: "Preferences and Takeaways Analysis"
+author: "CS"
+date: '2022-05-11'
+output: html_document
+---
+
+Analysis for "Striking a Balance: Reader Takeaways and Preferences when Integrating Text and Charts"
+
+===
+
+# Introduction
+
+This file contains and describes the analyses from our paper.
+
+Please cite:
+
+Stokes, C., Setlur, V., Cogley, B., Satyanarayan, A., & Hearst, M. (2022). Striking a Balance: Reader Takeaways and Preferences when Integrating Text and Charts. *IEEE Transactions of Visualization and Computer Graphics*.
+
+# Setup
+
+## Required libraries
+
+To ensure all the packages required are installed, the following script will install and load the necessary packages.
+
+```{r setup}
+
+packages = c("tidyverse", "ggplot2", "plyr", "car", "lme4", "stringr", "ggpubr", "PMCMRplus", "irr")
+
+package.check <- lapply(
+  packages,
+  FUN = function(x) {
+    if (!require(x, character.only = TRUE)) {
+      install.packages(x, dependencies = TRUE)
+      library(x, character.only = TRUE)
+    }
+  }
+)
+
+```
+
+## Ggplot theme
+
+```{r ggplot_theme}
+
+theme_set(theme_light())
+
+```
+
+# Load and Clean Data
+
+Data loading and cleaning is implemented below. A few data frames are defined. 
+
+## `df`
+
+`df` is the raw data. Column names from `df` are described below.
+
+- **A**: data shape assigned for ranking set A
+- **participantID**: anonymous ID given to participant in order of experiment completion
+- **rank_0**: ranking of chart with 0 test, prior to takeaways, set A
+- **rank_2_A**: ranking of chart with title and on chart annotation, prior to takeaways, set A
+- **rank_equaltxt**: ranking of chart with same story depicted as the text paragraph, prior to takeaways, set A
+- **rank_txt**: ranking of text paragraph, prior to takeaways, set A
+- **rankElab_A**: elaboration on ranking choices, prior to takeaways, set A
+- **B**: data shape assigned for ranking set B
+- **rank_1**: ranking of chart with title, prior to takeaways, set B
+- **rank_2_B**: ranking of chart with title and on chart annotation, prior to takeaways, set B
+- **rank_3**: ranking of chart with title and 2 on chart annotations, prior to takeaways, set B
+- **rankElab_B**: elaboration on ranking choices, prior to takeaways, set B
+- **generatedChart**: one of nine generated charts used in this study (1 to 9)
+- **chartSemanticLevel**: semantic level present on the chart (1 to 4)
+- **chartSemanticLevel_next**: if chart had two annotations, the second semantic level present on the chart (1 to 4, N/A) 
+- **takeaway1**: participant's first takeaway 
+- **takeaway2**: participant's second takeaway (optional) 
+- **takeaway3**: participant's third takeaway (optional)
+- **takeawayInfoReliance**: which aspect of information did the participant rely on in their takeaways (1 = all text, 5 = all vis) 
+- **attn_check**: response to attention check (should be 5) 
+- **lit.1_1**: first literacy ranking question
+- **lit.2_1**: second literacy ranking question 
+- **lit.3_1**: third literacy ranking question 
+- **lit.4_1**: fourth literacy ranking question 
+- **lit.5_1**: fifth literacy ranking question 
+- **lit.6_1**: sixth literacy ranking question 
+- **pref.1_1**: seventh literacy ranking question, first preference question 
+- **pref.2_1**: eighth literacy ranking question, second preference question 
+- **pref.3_1**: ninth literacy ranking question, third preference question 
+- **pref.4_1**: tenth literacy ranking question, fourth preference question 
+- **chartQuote**: same as pref.4_1 
+- **readingQuote**: fifth preference question, score inverse from other preference questions 
+- **age**: age bucket of participant 
+- **education**: education bucket of participant 
+- **chartFreq**: how frequently (bucket) participant sees charts
+- **chartFreqValue**: how frequently (coded) participant sees charts; 1 = "Once a year or less", 7 = "Every day" 
+- **chartContext**: list of contexts in which participant sees charts 
+- **chartContext_12_TEXT**: 'other' fill in option for chartContext 
+- **readShortFreq**: how frequently (bucket) participant reads in short form
+- **readShortFreqValue**: how frequently (coded) participant reads in short form; 1 = "Every day", 7 = "Once a year or less" 
+- **readLongFreq**: how frequently (bucket) participant reads in long form 
+- **readLongFreqValue**: how frequently (coded) participant reads in long form; 1 = "Every day", 7 = "Once a year or less" 
+- **readContext**: list of contexts in which participant reads 
+- **readContext_12_TEXT**: 'other' fill in option for readContext
+- **preference**: calculated preference score (sum of preference questions)
+- **literacy**: calculated literacy score (sum of literacy questions)
+- **preferenceCategory**: assigned preference category based on preference score
+
+
+
+```{r load_raw_data}
+
+df <- read.csv(file = "balanceText.csv")
+
+```
+
+To clean the raw data, we correct for inverse coding of select preference questions and calculate preference and literacy scores. 
+
+From the preference and literacy scores, we assign a broad preference category to each participant: textual, visual, or both. The higher the preference score, the greater the preference for visual information. Therefore, participants with scores in the bottom 25% are assigned to 'textual', participants with scores in the top 25% are assigned to 'visual'. The middle 50% are assigned the category of 'both'.
+
+```{r clean_raw_data}
+
+# correct for inverse coding of select preference questions
+df$pref.5_1 <- 6 - df$readingQuote
+
+# calculate preference score
+preferenceColumns <- c("pref.1_1","pref.2_1","pref.3_1","pref.4_1", "pref.5_1", "chartFreqValue", "readShortFreqValue", "readLongFreqValue")
+df$preference <- rowSums(df[, preferenceColumns])
+
+# calculate literacy score
+literacyColumns <- c("lit.1_1","lit.2_1","lit.3_1","lit.4_1","lit.5_1","lit.6_1", "pref.1_1","pref.2_1","pref.3_1","pref.4_1")
+df$literacy <- rowSums(df[, literacyColumns])
+
+# assign broad preference category
+df$preferenceCategory <- ifelse(
+  df$preference <= quantile(df$preference, 0.25), 'textual',
+  ifelse(
+      df$preference >= quantile(df$preference, 0.75), 'visual',
+      'both'
+  )
+)
+
+```
+
+## `rq1`
+
+`rq1` contains data in long form regarding the rankings sets and responses. Column names from `rq1` are described below.
+
+- **participantID**: anonymous ID given to participant in order of experiment completion
+- **rankVariant**: stimuli variant ranked (0, 1, 2, 3, equaltxt, txt). 0 indicates no-text, 1 indicates title-only, 2 indicates title-annotation1, 3 indicates title-annotation2, equaltxt indicates annotation+, txt indicates text-only
+- **rankPosition**: position each variant was ranked at (1, 2, 3, 4). 1 indicates ranked first, and so on.
+- **rankSet**: indicates which ranking set the variant belonged to (A, B)
+- **preferenceCategory**: assigned preference category based on preference score
+
+
+```{r clean_ranking_data}
+
+# turn into long table
+rq1 <- gather(df, rankCombination, rankPosition,
+               rank_0,	rank_2_A,	rank_equaltxt, rank_txt,	
+               rank_1,	rank_2_B,	rank_3)
+# organize by participant
+rq1 <- arrange(rq1, participantID)
+
+# separate out the ranking set and stimuli information
+rq1$rankSet <- ifelse(grepl('0', rq1$rankCombination), 'A',
+                       ifelse(grepl('2_A', rq1$rankCombination), 'A', 
+                              ifelse(grepl('txt', rq1$rankCombination), 'A',
+                                     ifelse(grepl('equaltxt', rq1$rankCombination), 'A', 'B'))))
+rq1 <- rq1 %>% separate(rankCombination, c(NA, 'rankVariant'), '_')
+
+# select columns of interest
+rq1 <- select(rq1, c("participantID", "rankVariant","rankPosition","rankSet", 'preferenceCategory'))
+
+```
+
+### `h1a`
+
+`h1a` is a subset of `rq1` which contains data from the 'visual' preference group for ranking set A. This subset pertains to H1a from our paper. Column names from `h1a` are the same as `rq1`.
+
+```{r visual_A}
+
+h1a <- subset(subset(rq1, preferenceCategory == 'visual'), rankSet == 'A')
+
+```
+
+
+### `h1b`
+
+`h1b` is a subset of `rq1` which contains data from the 'textual' preference group for ranking set A. This subset pertains to H1a from our paper. Column names from `h1b` are the same as `rq1`.
+
+```{r textual_A}
+
+h1b <- subset(subset(rq1, preferenceCategory == 'textual'), rankSet == 'A')
+
+```
+
+
+### `h1c`
+
+`h1c` is a subset of `rq1` which contains data from the 'visual' preference group for ranking set B. This subset pertains to H1a from our paper. Column names from `h1c` are the same as `rq1`.
+
+```{r visual_B}
+
+h1c <- subset(subset(rq1, preferenceCategory == 'visual'), rankSet == 'B')
+
+```
+
+### `h1d`
+
+`h1d` is a subset of `rq1` which contains data from the 'textual' preference group for ranking set B. This subset pertains to H1a from our paper. Column names from `h1d` are the same as `rq1`.
+
+```{r textual_B}
+
+h1d <- subset(subset(rq1, preferenceCategory == 'textual'), rankSet == 'B')
+
+```
+
+## `rq2_3`
+
+`rq2_3` contains data in long form regarding the takeaway responses. Because the takeaways were coded by the paper authors, the data comes from an external csv, which contains reshaped data from `df` and the codes applied by paper authors. The reshaping process is also provided with blank columns for the coding scheme using in our paper. Running the script will export a csv for coding.
+
+Reshapes or subsets of this dataset are used for analyses in both RQ2 and RQ3.
+
+Column names from `rq2_3` are described below.
+
+- **participantID**: anonymous ID given to participant in order of experiment completion
+- **generatedChart**: one of nine generated charts used in this study (1 to 9)
+- **takeawayInfoReliance**: which aspect of information did the participant rely on in their takeaways (1 = all text, 5 = all vis) 
+- **takeawayRank**: position of the given takeaway in participant response (1, 2, 3)
+- **chartSemanticLevel**: semantic level present on the chart (1 to 4)
+- **chartSemanticLevel_next**: if chart had two annotations, the second semantic level present on the chart (1 to 4, N/A) 
+- **chartAnnotation**: annotation text from the chart matching the generated chart in generatedChart and the semantic level in chartSemanticLevel
+- **chartAnnotation_next**: annotation text from the chart matching the generated chart in generatedChart and the semantic level in chartSemanticLevel_next
+- **takeawayText**: participant takeaway text
+- **takeawayLevel**: level of the participant takeaway, coded by authors (1, 2, 3, 4)
+- **isTakeawayMatch**: binary response as to whether the participant matched an annotation in their takeaway, coded by authors (0, 1). In order to match, the participant had to use specific, similar language to the annotation
+- **takeawayMatchLevel**: the level of annotation which was matched in the takeaway if it was a match, coded by authors (1, 2, 3, 4)
+- **isTakeawayExt**: binary response as to whether the participants brought in external information which was not shown in the chart or the text, coded by authors (0, 1)
+- **isTakeawayL1**: binary response as to whether the participant's takeaway is L1, calculated from author codes in takeawayLevel (0, 1)
+- **isTakeawayL2**: binary response as to whether the participant's takeaway is L2, calculated from author codes in takeawayLevel (0, 1)
+- **isTakeawayL3**: binary response as to whether the participant's takeaway is L3, calculated from author codes in takeawayLevel (0, 1)
+- **isTakeawayL4**: binary response as to whether the participant's takeaway is L4, calculated from author codes in takeawayLevel (0, 1)
+
+```{r import_takeaway_data}
+
+rq2_3 <- read.csv(file = 'takeaways_coded.csv')
+
+```
+
+```{r reshape_takeaway_data}
+
+# remove rows which contain nonsense respopnses (coded as takeawayLevel = 0)
+rq2_3 <- subset(rq2_3, takeawayLevel != 0)
+
+# make binary columns for each semantic level being on chart or not
+rq2_3$onChartL1 <- ifelse(rq2_3$chartSemanticLevel == 1, 1, 
+                             ifelse(rq2_3$chartSemanticLevel_next == 1, 1, 0))
+rq2_3$onChartL2 <- ifelse(rq2_3$chartSemanticLevel == 2, 1, 
+                             ifelse(rq2_3$chartSemanticLevel_next == 2, 1, 0))
+rq2_3$onChartL3 <- ifelse(rq2_3$chartSemanticLevel == 3, 1, 
+                             ifelse(rq2_3$chartSemanticLevel_next == 3, 1, 0))
+rq2_3$onChartL4 <- ifelse(rq2_3$chartSemanticLevel == 4, 1, 
+                             ifelse(rq2_3$chartSemanticLevel_next == 4, 1, 0))
+rq2_3 <- rq2_3 %>% mutate_at(vars(starts_with("onChart")), ~replace_na(.,0))
+
+
+# reshape data to put all semantic levels on-chart in a single column
+rq2_3 <- gather(rq2_3, isNext, onChartSemanticLevel, chartSemanticLevel, chartSemanticLevel_next)
+rq2_3 <- subset(rq2_3, !is.na(onChartSemanticLevel))
+
+```
+
+### `h2a` subsets
+
+For the logistical regressions used to analyze H2a, we created four subsets of data, each with a different level as the comparison point. This ensured that we did not accidentally make a conclusion with the wrong semantic level as the comparison. The creation of these is below.
+
+```{r h2a_subset_L1}
+
+h2a_L1 <- rq2_3
+
+```
+
+```{r h2a_subset_L2}
+
+h2a_L2 <- h2a_L1
+
+h2a_L2$onChartSemanticLevel <- ifelse(h2a_L2$onChartSemanticLevel == 1, "a1", h2a_L2$onChartSemanticLevel)
+
+```
+
+```{r h2a_subset_L3}
+
+h2a_L3 <- h2a_L2
+
+h2a_L3$onChartSemanticLevel <- ifelse(h2a_L3$onChartSemanticLevel == 2, "a2", h2a_L3$onChartSemanticLevel)
+
+```
+
+```{r h2a_subset_L4}
+
+h2a_L4 <- h2a_L3
+
+h2a_L4$onChartSemanticLevel <- ifelse(h2a_L4$onChartSemanticLevel == 3, "a3", h2a_L4$onChartSemanticLevel)
+
+```
+
+### `takeaways_uncoded`
+
+In order to code the takeaways for a match, coders required the text from the annotations to be provided alongside the participants' takeaways. To do this, we pull information regarding the chart annotations from `annotationInformation`.
+
+Column names for `annotationInformation` are described below.
+
+- **generatedChart**: one of nine generated charts used in this study (1 to 9)
+- **semanticLevel**: semantic level of the annotation on the chart
+- **annotationText**: content of the annotations on the chart
+- **annotationPosition**: semantic position of the annotation (title, trend, point, axis)
+
+```{r clean_and_export}
+
+#set up data to export to code takeaways
+annotationInformation <- read.csv(file='annotationInformation.csv')
+
+# make row for each takeaway
+takeaways_uncoded <- gather(df, takeawayRank, takeawayText,
+               takeaway1, takeaway2, takeaway3)
+# take out empty rows (not all participants provided more than 1 takeaway)
+takeaways_uncoded <- takeaways_uncoded[!(takeaways_uncoded$takeawayText==""),]
+# remove 'takeaway' from the 'takeawayRank' column text
+takeaways_uncoded$takeawayRank <- substr(takeaways_uncoded$takeawayRank, nchar(takeaways_uncoded$takeawayRank), nchar(takeaways_uncoded$takeawayRank))
+
+# arrange dataframe
+takeaways_uncoded <- arrange(takeaways_uncoded, participantID) 
+
+# add the chart annotations for coding process 
+# first, for the first annotation on a chart
+annotationInformation_first <- merge(takeaways_uncoded, annotationInformation, by.x =c('chartSemanticLevel', 'generatedChart'), by.y = c('semanticLevel', 'generatedChart'))
+annotationInformation_first <- arrange(annotationInformation_first, participantID)
+takeaways_uncoded$chartAnnotation <- annotationInformation_first$annotationText
+# then, if there are two annotations, add the second annotation
+annotationInformation_second <- merge(takeaways_uncoded, annotationInformation, by.x =c('chartSemanticLevel_next', 'generatedChart'), by.y = c('semanticLevel', 'generatedChart'), all.x = TRUE)
+annotationInformation_second <- arrange(annotationInformation_second, participantID)
+takeaways_uncoded$chartAnnotation_next <- annotationInformation_second$annotationText
+
+#make column for each takeaway in the participant's takeaways
+takeaways_uncoded$takeawayLevel <- ''
+takeaways_uncoded$isTakeawayMatch <- ''
+takeaways_uncoded$isTakeawayMatchLevel <- ''
+takeaways_uncoded$isTakeawayExt <- ''
+takeaways_uncoded$isTakeawayL1 <- ''
+takeaways_uncoded$isTakeawayL2 <- ''
+takeaways_uncoded$isTakeawayL3 <- ''
+takeaways_uncoded$isTakeawayL4 <- ''
+
+#arrange and trim down export
+takeaways_uncoded <- arrange(takeaways_uncoded, participantID) 
+takeaways_uncoded <- select(takeaways_uncoded, c("participantID", "generatedChart",  "takeawayInfoReliance", "takeawayRank","chartSemanticLevel", "chartSemanticLevel_next", "chartAnnotation", "chartAnnotation_next", "takeawayText", 'takeawayLevel', 'isTakeawayMatch', "isTakeawayL1", "isTakeawayL2", "isTakeawayL3", "isTakeawayL4", "isTakeawayExt"))
+
+# export for coding
+write.csv(takeaways_uncoded, "takeaways_uncoded.csv")
+
+```
+
+### `irr`
+
+We calculated interrater reliability using a separate csv which contains the codes from both coders, `takeaway_coding_irr.csv`. `takeaways_coded` contains one set of codes which were agreed upon after discussion. 
+
+```{r load_irr_data}
+
+takeaway_coding_irr <- read.csv(file = "takeaway_coding_irr.csv")
+
+```
+
+### `h2cd`
+
+To investigate H2c and H2d, we selected and reshaped columns from `df` which contained the semantic level seen by a participant and the degree to which they reported using text vs. visual information in their takeaway. The columns are described below.
+
+- **participantID**: anonymous ID given to participant in order of experiment completion
+- **semanticSource**: whether the semantic level originally belonged to `chartSemanticLevel` or `chartSemanticLevel_next` in `df`
+- **semanticLevel**: semantic level present on the chart (1 to 4)
+- **takeawayInfoReliance**: which aspect of information did the participant rely on in their takeaways (1 = all text, 5 = all vis) 
+
+```{r shape_reliance_data}
+
+# select columns of interest from df
+h2cd <- select(df, c('participantID', 'chartSemanticLevel', 'chartSemanticLevel_next', 'takeawayInfoReliance', 'preferenceCategory'))
+
+# reshape such that all the semantic level information is in one column
+h2cd <- gather(h2cd, 'semanticSource', 'semanticLevel', 'chartSemanticLevel', 'chartSemanticLevel_next')
+
+# remove rows which do not contain a semantic level (chart only had one semantic level displayed)
+h2cd <- h2cd[!is.na(h2cd$semanticLevel),]
+
+# reorganize the dataset
+h2cd <- arrange(h2cd, participantID) 
+
+```
+
+### `h3`
+
+To investigate H3, we reshape columns from `rq2_3` and add information from `annotationInformation`, which was also used to set up the takeaways for coding. For this analysis, we only want to examine takeaways which matched the annotations, coded for in `isTakeawayMatch`. 
+
+```{r add_position_data}
+
+# get subset of rq2_3 in which the takeaways are a match to the level displayed on the chart
+h3 <- subset(rq2_3, isTakeawayMatch == 1)
+
+# collect information for the location of the takeaway annotation
+positionInformation = list()
+for (row in 1:nrow(h3)) {
+  generated_chart <- h3[row, "generatedChart"]
+  semantic_level <- h3[row, "onChartSemanticLevel"]
+  # get a subset of the annotationInformation for the correct generated chart and the correct semantic level
+  pos <- subset(subset(annotationInformation, generatedChart == generated_chart), 
+                semanticLevel == semantic_level)$annotationPosition
+  positionInformation <- append(positionInformation, pos)
+}	
+# unlist and add a column for the positions of the matched annotations
+positionInformation <- unlist(positionInformation)
+h3$annotationPosition <- positionInformation
+
+
+```
+
+Because we are using logistic regressions, we also must make sure we are making proper and intended comparisons. We only care about positions compared to the title position, so we set up the `h3` dataframe to have that as the comparison point
+
+```{r edit_position_data}
+
+h3$annotationPosition <- ifelse(h3$annotationPosition == "axis", "zaxis",
+                                ifelse(h3$annotationPosition == "point", "zpoint",
+                                       h3$annotationPosition))
+
+```
+
+
+# Descriptive information
+
+Below we provide visuals describing the participant information, the counterbalancing within the survey conditions, and information regarding the coded takeaway levels.
+
+## Participant Information
+
+We examine the distributions of participant age, education, literacy score, preference score, and the assigned preference groups.
+
+```{r describe_participants}
+
+# Participant age distribution
+ggplot(df, aes(x = age))+
+  geom_bar(stat = 'count', fill = 'gray') +
+  ggtitle('Distribution of participant age')
+
+# Participant education distribution
+ggplot(df, aes(x = education))+
+  geom_bar(stat = 'count', fill = 'gray') +
+  ggtitle('Distribution of participant education')+ 
+  theme(axis.text.x = element_text(angle = 90))
+
+# Participant literacy score distribution
+ggplot(df, aes(x = '', y = literacy)) +
+  geom_violin(fill = 'gray')+
+  ggtitle('Distribution of participant literacy score')+
+  ylim(0, 51)
+
+# Participant preference score distribution
+ggplot(df, aes(x = '', y = preference)) +
+  geom_violin(draw_quantiles = c(0.25, 0.75)) +
+  ggtitle('Distribution of participant preference score')+
+  ylim(0, 51)
+
+# Preference groups distribution
+ggplot(df, aes(x = preferenceCategory))+
+  geom_bar(stat = 'count', fill = 'gray') +
+  ggtitle('Distribution of broad preference groups')
+
+
+```
+
+
+## Survey Counterbalancing
+
+We examine the counterbalancing of generated chart within the ranking sets (A and B), the generated chart shown in the takeaway question and the semantic levels seen in the takeaway chart.
+
+```{r describe_counterbalancing}
+
+# ranking set A generated chart
+ggplot(df, aes(x = A))+
+  geom_bar(stat = 'count', fill = 'gray') +
+  ggtitle('Generated charts seen in Ranking Set A') +
+  scale_x_continuous(breaks=c(1, 2, 3, 4, 5, 6, 7, 8, 9))
+
+# ranking set B generated charts
+ggplot(df, aes(x = B))+
+  geom_bar(stat = 'count', fill = 'gray') +
+  ggtitle('Generated charts seen in Ranking Set B')+
+  scale_x_continuous(breaks=c(1, 2, 3, 4, 5, 6, 7, 8, 9))
+
+# takeaway generated charts
+ggplot(df, aes(x = generatedChart))+
+  geom_bar(stat = 'count', fill = 'gray') +
+  ggtitle('Generated charts seen in Takeaways')+
+  scale_x_continuous(breaks=c(1, 2, 3, 4, 5, 6, 7, 8, 9))
+
+# takeaway annotation levels seen
+ggplot(subset(gather(df, isNext, onChartSemanticLevel, chartSemanticLevel, chartSemanticLevel_next), !is.na(onChartSemanticLevel)), aes(x = onChartSemanticLevel))+
+  geom_bar(stat = 'count', fill = 'gray') +
+  ggtitle('Annotations levels seen in Takeaways')
+
+```
+
+## Takeaway Levels
+
+```{r describe_takeaway_levels}
+
+ggplot(subset(rq2_3, isNext == 'chartSemanticLevel'), aes(x = takeawayLevel))+
+  geom_bar(stat = 'count', fill = 'gray') +
+  ggtitle('Semantic levels in participant takeways')
+
+```
+
+# Analysis
+
+Below, we analyze the data, according to the research questions and hypotheses from our paper. The method, approach, and analysis technique are discussed in each section.
+
+## RQ1: What are readers preferences when viewing charts with different amounts and semantic levels of text? How does this vary based on overall preference for textual or visual information?
+
+To investigate this hypothesis, we conducted Friedman tests for the rank-order data and post-hoc Nemenyi's tests to examine pairwise comparisons. We also calculate the average rank positions for each variant. This process is the same for H1a through H1d.
+
+
+### H1a
+
+Readers with an overall preference for visual information will prefer charts with a lot of annotations compared to the all text version. 
+
+To address this hypothesis, we are interested in the ranking set which contains the all-text version (Set A) and the visual group of participants.
+
+
+```{r h1a}
+# friedman test
+friedman.test(y=h1a$rankPosition, groups = h1a$rankVariant, blocks = h1a$participantID)
+
+# posthoc nemenyi test
+frdAllPairsNemenyiTest(y=h1a$rankPosition, groups = h1a$rankVariant, blocks = h1a$participantID)
+
+# average rankings
+aggregate(rankPosition ~ rankVariant, h1a, mean)
+
+```
+
+
+### H1b 
+
+Readers with an overall preference for textual information will prefer the all text version compared to charts with little or no text.
+
+To address this hypothesis, we are interested in the ranking set which contains the all-text version (Set A) and the textual group of participants.
+
+```{r h1b}
+# friedman test
+friedman.test(y=h1b$rankPosition, groups = h1b$rankVariant, blocks = h1b$participantID)
+
+# posthoc nemenyi test
+frdAllPairsNemenyiTest(y=h1b$rankPosition, groups = h1b$rankVariant, blocks = h1b$participantID)
+
+# average rankings
+aggregate(rankPosition ~ rankVariant, h1b, mean)
+
+```
+
+### H1c
+
+Readers with an overall preference for visual information will prefer charts with fewer annotations.
+
+To address this hypothesis, we are interested in the ranking set which contains the fine-grained comparisons (Set B), to address fewer vs. greater number of annotations and the visual group of participants.
+
+```{r h1c}
+# friedman test
+friedman.test(y=h1c$rankPosition, groups = h1c$rankVariant, blocks = h1c$participantID)
+
+# posthoc nemenyi test
+frdAllPairsNemenyiTest(y=h1c$rankPosition, groups = h1c$rankVariant, blocks = h1c$participantID)
+
+# average rankings
+aggregate(rankPosition ~ rankVariant, h1c, mean)
+
+```
+
+### H1d
+
+Readers with an overall preference for textual information will prefer charts with a greater number of annotations.
+
+To address this hypothesis, we are interested in the ranking set which contains the fine-grained comparisons (Set B), to address fewer vs. greater number of annotations and the textual group of participants.
+
+
+```{r h1d}
+# friedman test
+friedman.test(y=h1d$rankPosition, groups = h1d$rankVariant, blocks = h1d$participantID)
+
+# posthoc nemenyi test
+frdAllPairsNemenyiTest(y=h1d$rankPosition, groups = h1d$rankVariant, blocks = h1d$participantID)
+
+# average rankings
+aggregate(rankPosition ~ rankVariant, h1d, mean)
+
+```
+
+### Exploratory (overall)
+
+Here, we calculate averages for all participants, not just those in the visual or textual groups. These analyses were not preregistered nor do they relate to a specfiic hypotheses and thus are considered exploratory in nature. However, they offer useful insight into the overall ranking and the ways in which specific preference groups may differ from the aggregate. 
+
+```{r exploratory_rq1}
+
+# friedman test for set A
+friedman.test(y=subset(rq1, rq1$rankSet == 'A')$rankPosition, groups = subset(rq1, rq1$rankSet == 'A')$rankVariant, blocks = subset(rq1, rq1$rankSet == 'A')$participantID)
+
+# posthoc nemenyi test for set A
+frdAllPairsNemenyiTest(y=subset(rq1, rq1$rankSet == 'A')$rankPosition, groups = subset(rq1, rq1$rankSet == 'A')$rankVariant, blocks = subset(rq1, rq1$rankSet == 'A')$participantID)
+
+# average rankings for set A
+aggregate(rankPosition ~ rankVariant, subset(rq1, rq1$rankSet == 'A'), mean)
+
+
+# friedman test for set B
+friedman.test(y=subset(rq1, rq1$rankSet == 'B')$rankPosition, groups = subset(rq1, rq1$rankSet == 'B')$rankVariant, blocks = subset(rq1, rq1$rankSet == 'B')$participantID)
+
+# posthoc nemenyi test for set B
+frdAllPairsNemenyiTest(y=subset(rq1, rq1$rankSet == 'B')$rankPosition, groups = subset(rq1, rq1$rankSet == 'B')$rankVariant, blocks = subset(rq1, rq1$rankSet == 'B')$participantID)
+
+# average rankings for set B
+aggregate(rankPosition ~ rankVariant, subset(rq1, rq1$rankSet == 'B'), mean)
+
+```
+
+## RQ2: How do the different semantic levels of text affect the type of information included in readers' takeaways? Further, when do readers include information in their takeaways that are not found either in the chart or the text? Which semantic levels of text do readers rely on when they form their takeaways? 
+
+First, we calculate irr for all three of the coded areas: takeawayLevel, isTakeawayMatch, and isTakeawayExt.
+
+```{r calculate_irr}
+
+# calculate irr for takeawayLevel (qualitative)
+kappa2(select(takeaway_coding_irr, c('takeawayLevelC', 'takeawayLevelV')))
+
+# calculate irr for isTakeawayMatch (binary)
+maxwell(select(takeaway_coding_irr, c('isTakeawayMatchC', 'isTakeawayMatchV')))
+
+# calculate irr for isTakeawayExt (binary)
+maxwell(select(takeaway_coding_irr, c('isTakeawayExtC', 'isTakeawayExtV')))
+
+```
+
+### H2a
+
+Readers' takeaways will be more likely to contain a given semantic level if the text accompanying the chart also contains that semantic level. This will be true for all semantic levels.
+
+We used logistic regression to analyze this hypothesis to determine *predicting* factors for the elicitation of each semantic level in a takeaway. Comments are made throughout to signify which comparisons are being made in each section. 
+
+For each section, we compare the likelihood of a participant making a takeaway in the semantic level of the section (e.g., `isTakeawayL1`) when the annotation is present on the chart (`onChartSemanticLevel` = 1) in comparison to another level (e.g., `onChartSemanticLevel` = 2). The summary of the logistic model gives us the z- and p-values in the $coefficients section, which is displayed in the following scripts. 
+
+For each model, we are looking for a single value which will indicate the specific comparison we are looking to make. Because the data is quantitative (different semantic levels) rather than qualitative, this requires twelve total comparisons (3 for each semantic level). Each model is named `takeaway_[target level]_to_[comparison level]` (e.g., `takeaway_L1_to_L2`). The value of interest is in the row `as.factor(onChartSemanticLevel)[target level]`. In some cases, the target level will be altered with an 'a' placed in front of it to ensure the comparisons are being made to the proper comparison level. So, for the previous example (shown below), the value of interest is in the Pr(<|z|) column in `as.factor(onChartSemanticLevel)[a1]`.
+
+This indicates whether the factor is significant or whether the presence of the target annotation (e.g., L1) has an effect significantly greater or lesser than the presence of the comparison annotation (e.g., L2) on the takeaway being in the semantic level of the target annotation (e.g., L1). To find the value of this effect, we compute the exponential function of the provided coefficient (in the 'Estimate' column). To determine the interval provided in the paper, we subtract the Std. Error provided to calculate the lower bound of the Estimate and add it to calculate the upper bound. We then compute the exponential function of both.
+
+In the first comparison in each section, we also run an Anova. This tells us whether the differences between counts for the given takeaway level (e.g,. L1) differ significantly between the `onChartSemanticLevel`. These values are not reported in the paper but can give some context to the information provided by the models. 
+
+#### Takeaway L1 comparisons
+
+Likelihood of L1 takeaway being made when there is an L1 annotation compared to when there is an L2 annotation
+
+```{r takeaway_L1_comparedto_L2}
+
+takeaway_L1_to_L2 <- glm(formula = isTakeawayL1 ~ as.factor(onChartSemanticLevel), family = binomial(link = "logit"), data = h2a_L2)
+summary(takeaway_L1_to_L2)
+Anova(takeaway_L1_to_L2)
+exp(coef(takeaway_L1_to_L2))[4]
+
+```
+
+
+Likelihood of L1 takeaway being made when there is an L1 annotation compared to when there is an L3 annotation
+
+
+```{r takeaway_L1_comparedto_L3}
+
+takeaway_L1_to_L3 <- glm(formula = isTakeawayL1 ~ as.factor(onChartSemanticLevel), family = binomial(link = "logit"), data = h2a_L3)
+summary(takeaway_L1_to_L3)
+exp(coef(takeaway_L1_to_L3))[3]
+
+```
+
+Likelihood of L1 takeaway being made when there is an L1 annotation compared to when there is an L4 annotation
+
+```{r takeaway_L1_comparedto_L4}
+
+takeaway_L1_to_L4 <- glm(formula = isTakeawayL1 ~ as.factor(onChartSemanticLevel), family = binomial(link = "logit"), data = h2a_L4)
+summary(takeaway_L1_to_L4)
+exp(coef(takeaway_L1_to_L4))[2]
+
+```
+
+#### Takeaway L2 comparisons
+
+Likelihood of L2 takeaway being made when there is an L2 annotation compared to when there is an L1 annotation
+
+```{r takeaway_L2_comparedto_L1}
+
+takeaway_L2_to_L1 <- glm(formula = isTakeawayL2 ~ as.factor(onChartSemanticLevel), family = binomial(link = "logit"), data = h2a_L1)
+summary(takeaway_L2_to_L1)
+Anova(takeaway_L2_to_L1)
+exp(coef(takeaway_L2_to_L1))[2]
+
+```
+
+Likelihood of L2 takeaway being made when there is an L2 annotation compared to when there is an L3 annotation
+
+```{r takeaway_L2_comparedto_L3}
+
+takeaway_L2_to_L3 <- glm(formula = isTakeawayL2 ~ as.factor(onChartSemanticLevel), family = binomial(link = "logit"), data = h2a_L3)
+summary(takeaway_L2_to_L3)
+exp(coef(takeaway_L2_to_L3))[4]
+
+```
+
+Likelihood of L2 takeaway being made when there is an L2 annotation compared to when there is an L4 annotation
+
+```{r takeaway_L2_comparedto_L4}
+
+takeaway_L2_to_L4 <- glm(formula = isTakeawayL2 ~ as.factor(onChartSemanticLevel), family = binomial(link = "logit"), data = h2a_L4)
+summary(takeaway_L2_to_L4)
+exp(coef(takeaway_L2_to_L4))[3]
+
+```
+
+#### Takeaway L3 comparisons
+
+Likelihood of L3 takeaway being made when there is an L3 annotation compared to when there is an L1 annotation
+
+```{r takeaway_L3_comparedto_L1}
+
+takeaway_L3_to_L1 <- glm(formula = isTakeawayL3 ~ as.factor(onChartSemanticLevel), family = binomial(link = "logit"), data = h2a_L1)
+summary(takeaway_L3_to_L1)
+Anova(takeaway_L3_to_L1)
+exp(coef(takeaway_L3_to_L1))[3]
+
+```
+
+
+Likelihood of L3 takeaway being made when there is an L3 annotation compared to when there is an L2 annotation
+
+
+```{r takeaway_L3_comparedto_L2}
+
+takeaway_L3_to_L2 <- glm(formula = isTakeawayL3 ~ as.factor(onChartSemanticLevel), family = binomial(link = "logit"), data = h2a_L2)
+summary(takeaway_L3_to_L2)
+exp(coef(takeaway_L3_to_L2))[2]
+
+```
+
+Likelihood of L3 takeaway being made when there is an L3 annotation compared to when there is an L4 annotation
+
+```{r takeaway_L3_comparedto_L4}
+
+takeaway_L3_to_L4 <- glm(formula = isTakeawayL3 ~ as.factor(onChartSemanticLevel), family = binomial(link = "logit"), data = h2a_L4)
+summary(takeaway_L3_to_L4)
+exp(coef(takeaway_L3_to_L4))[4]
+
+```
+
+#### Takeaway L4 comparisons
+
+Likelihood of L4 takeaway being made when there is an L4 annotation compared to when there is an L1 annotation
+
+```{r takeaway_L4_comparedto_L1}
+
+takeaway_L4_to_L1 <- glm(formula = isTakeawayL4 ~ as.factor(onChartSemanticLevel), family = binomial(link = "logit"), data = h2a_L1)
+summary(takeaway_L4_to_L1)
+Anova(takeaway_L4_to_L1)
+exp(coef(takeaway_L4_to_L1))[4]
+
+```
+
+
+Likelihood of L4 takeaway being made when there is an L4 annotation compared to when there is an L2 annotation
+
+
+```{r takeaway_L4_comparedto_L2}
+
+takeaway_L4_to_L2 <- glm(formula = isTakeawayL4 ~ as.factor(onChartSemanticLevel), family = binomial(link = "logit"), data = h2a_L2)
+summary(takeaway_L4_to_L2)
+exp(coef(takeaway_L4_to_L2))[3]
+
+```
+
+Likelihood of L4 takeaway being made when there is an L4 annotation compared to when there is an L3 annotation
+
+```{r takeaway_L4_comparedto_L3}
+
+takeaway_L4_to_L3 <- glm(formula = isTakeawayL4 ~ as.factor(onChartSemanticLevel), family = binomial(link = "logit"), data = h2a_L3)
+summary(takeaway_L4_to_L3)
+exp(coef(takeaway_L4_to_L3))[2]
+
+```
+
+### H2b
+
+Readers will be more likely to include information in their takeaways that is not found in the chart or text when L1 is present in the chart.
+
+To examine these, we perform similar logistical regressions with `isTakeawayExt` as our variable of interest, rather than the specific level of the takeaway. The process is the same as that described in H2a. We are assessing whether the presence of an annotation in a given level (e.g., L1) makes it more or less likely that the takeaway will contain external information (`isTakeawayExt`) in comparison to all other levels. We conduct four logistical regressions to assess this (one for each level).
+
+However, we're interested in more than just a single value from the models for this hypothesis. In this case, we're interested in comparing all the levels for a single variable of interest, which means all the `as.factor(onChartSemanticLevel)` are of interest. However, the determination and calculations for significance remain the same.
+
+Likelihood of takeaway including external information when there is an annotation of any other level compared to when there is an L1 annotation
+
+
+```{r takeaway_ext_comparedto_L1}
+
+takeaway_ext_to_L1 <- glm(formula = isTakeawayExt ~  as.factor(onChartSemanticLevel),
+                          family = binomial(link = "logit"), data = h2a_L1)
+summary(takeaway_ext_to_L1)
+Anova(takeaway_ext_to_L1)
+exp(coef(takeaway_ext_to_L1))
+
+```
+
+Likelihood of takeaway including external information when there is an annotation of any other level compared to when there is an L2 annotation
+
+```{r takeaway_ext_comparedto_L2}
+
+takeaway_ext_to_L2 <- glm(formula = isTakeawayExt ~  as.factor(onChartSemanticLevel),
+                          family = binomial(link = "logit"), data = h2a_L2)
+summary(takeaway_ext_to_L2)
+Anova(takeaway_ext_to_L2)
+exp(coef(takeaway_ext_to_L2))
+
+```
+
+Likelihood of takeaway including external information when there is an annotation of any other level compared to when there is an L3 annotation
+
+```{r takeaway_ext_comparedto_L3}
+
+takeaway_ext_to_L3 <- glm(formula = isTakeawayExt ~  as.factor(onChartSemanticLevel),
+                          family = binomial(link = "logit"), data = h2a_L3)
+summary(takeaway_ext_to_L3)
+Anova(takeaway_ext_to_L3)
+exp(coef(takeaway_ext_to_L3))
+
+```
+
+Likelihood of takeaway including external information when there is an annotation of any other level compared to when there is an L4 annotation
+
+```{r takeaway_ext_comparedto_L4}
+
+takeaway_ext_to_L4 <- glm(formula = isTakeawayExt ~  as.factor(onChartSemanticLevel),
+                          family = binomial(link = "logit"), data = h2a_L4)
+summary(takeaway_ext_to_L4)
+Anova(takeaway_ext_to_L4)
+exp(coef(takeaway_ext_to_L4))
+
+```
+
+
+### H2c and H2d
+
+Readers will self-report as relying less on text when the text contains L1. Readers' will self-report as relying more on text when the text contains L4.
+
+H2c and H2d both rely on the same analysis, so they are grouped together. To examine these hypotheses, we use the `h2cd` dataframe to examine whether participants self-reported relying on text or visual components of the chart differently if it contained L1 vs. L4. We also include L2 and L3 in the analysis to better understand if other levels differed strongly.
+
+Specifically, we conducted an ANOVA to determine if there were any statistical differences between the means of the reliance scores of the different semantic levels. We then conducted a pairwise t-test with Bonferroni correction to determine which, if any, semantic levels differed significantly from each other.
+
+```{r h2cd}
+
+# first, conduct the anova
+anova_levels_h2cd <- aov(h2cd$takeawayInfoReliance ~ h2cd$semanticLevel)
+summary(anova_levels_h2cd)
+
+# then, pairwise t-test
+pairwise.t.test(h2cd$takeawayInfoReliance, h2cd$semanticLevel, p.adjust.method = "bonf")
+
+
+```
+
+Then, we calculated average values for reporting in the paper, along with standard error. 302 is the number of participants.
+
+```{r average_values_h2cd}
+
+round(cbind(tapply(h2cd$takeawayInfoReliance, h2cd$semanticLevel, mean), tapply(h2cd$takeawayInfoReliance, h2cd$semanticLevel, sd) / sqrt(302)), 4)
+
+```
+
+
+### H2e
+
+Readers with an overall preference for textual information will rely more on text within a chart. 
+
+We conducted the same analyses as H2c and H2d, using an ANOVA to determine differences between the three categories assigned (visual, textual, or both) and a pairwise t-test to determine differences between textual and visual groups. In order to do this, we used a subset of `h2cd` which removed the additional rows for the charts with two semantic levels. While we needed that information for the previous analysis, we need to look at the proper number of participants for this, without possibly overcounting members of a particular preference category.
+
+```{r h2e}
+
+pairwise.t.test(subset(h2cd, semanticSource == 'chartSemanticLevel')$takeawayInfoReliance, subset(h2cd, semanticSource == 'chartSemanticLevel')$preferenceCategory, p.adjust.method = "bonf")
+
+```
+
+Then, we calculated average values for reporting in the paper, along with standard error. 302 is the number of participants.
+
+```{r average_values_h2e}
+
+round(cbind(
+  tapply(subset(h2cd, semanticSource == 'chartSemanticLevel')$takeawayInfoReliance, 
+         subset(h2cd, semanticSource == 'chartSemanticLevel')$preferenceCategory, mean), 
+  tapply(subset(h2cd, semanticSource == 'chartSemanticLevel')$takeawayInfoReliance, 
+         subset(h2cd, semanticSource == 'chartSemanticLevel')$preferenceCategory, sd) / sqrt(302)), 4)
+
+```
+
+## RQ3: How does the placement of text affect how the reader integrates the text with the chart? 
+
+### H3
+
+Readers' takeaways will be most likely to match a given semantic level if the text containing that semantic level is positioned as a title.
+
+We used logistic regressions, as in H2a, to determine predicting factors for the elicitation of each semantic level in a takeaway, this time focusing on position as the factor of interest. Comments are made throughout to signify which comparisons are being made in each section. As in the case of H2a, the comparison points are important. 
+
+For each section, we compare the likelihood of a participant making a takeaway in the semantic level of the section (e.g., `isTakeawayL1`) when the annotation is positioned at a reference level (e.g., title) in comparison to the other positions. For this hypothesis, we are only interested in how the different positions compare to the title position, not to each other. 
+
+```{r position_L1}
+
+position_L1 <- glm(formula = isTakeawayL1 ~ as.factor(annotationPosition), family = binomial(link = "logit"), data = h3)
+summary(position_L1)
+Anova(position_L1)
+exp(coef(position_L1))
+
+```
+
+```{r position_L2}
+
+position_L2 <- glm(formula = isTakeawayL2 ~ as.factor(annotationPosition), family = binomial(link = "logit"), data = h3)
+summary(position_L2)
+Anova(position_L2)
+exp(coef(position_L2))
+
+```
+
+```{r position_L3}
+
+position_L3 <- glm(formula = isTakeawayL3 ~ as.factor(annotationPosition), family = binomial(link = "logit"), data = h3)
+summary(position_L3)
+Anova(position_L3)
+exp(coef(position_L3))
+
+```
+
+```{r position_L4}
+
+position_L4 <- glm(formula = isTakeawayL4 ~ as.factor(annotationPosition), family = binomial(link = "logit"), data = h3)
+summary(position_L4)
+Anova(position_L4)
+exp(coef(position_L4))
+
+```
+
+# End
+
+This concludes the analysis for "Striking a Balance: Reader Takeaways and Preferences when Integrating Text and Charts".
+
