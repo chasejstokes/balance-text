@@ -11,7 +11,9 @@ This repository contains supplementary materials for _Striking a Balance: Reader
 ## Repository contents
 
 * [survey.pdf](survey.pdf): Example survey as taken by participants.
+* [stimuli.pdf](stimuli.pdf): All stimuli used in the survey.
 * [analysis.md](analysis.md): Description of analyses from our paper using R code and associated output.
+* [data analysis/](data analysis/): Data files and script used in the analyses
 * [replicabilitystamp/](replicabilitystamp/): Files submitted for the [Replicability Stamp](http://www.replicabilitystamp.org/requirements.html)
-* [data/](data/): Data files used in the analyses
-* [survey-analysis.rmd](survey-analysis.rmd): R code used for the analyses in the documents above
+
+Contact [Chase Stokes](mailto:cstokes@ischool.berkeley.edu) with any questions or requests for additional materials from this project.
