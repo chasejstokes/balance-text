@@ -10,7 +10,7 @@ This repository contains supplementary materials for _Striking a Balance: Reader
 
 ## Repository contents
 
-* [survey.pdf](survey.pdf): Example survey as taken by participants.
+* [survey.pdf](survey.pdf): Survey (inluding all possible conditions and charts viewed)
 * [stimuli.pdf](stimuli.pdf): All stimuli used in the survey.
 * [analysis.md](analysis.md): Description of analyses from our paper using R code and associated output.
 * [data analysis/](data analysis/): Data files and script used in the analyses
