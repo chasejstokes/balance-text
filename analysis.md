@@ -8,7 +8,7 @@ Stokes, C., Setlur, V., Cogley, B., Satyanarayan, A., & Hearst, M. (2022). Strik
 
 # Setup
 
-Data cleaning and reshaping will not be included in this file, but can be found in [data_analysis/balanceText.Rmd](data_analysis/balanceText.Rmd).
+Data cleaning and reshaping will not be included in this file, but can be found in [balanceText.Rmd](data_analysis/balanceText.Rmd).
 
 ## Required libraries
 
@@ -68,5 +68,35 @@ exp(coef(takeaway_L1_to_L2))[4]
 
 ```
 
+In examining this question, we also compare the self-reported reliance on different forms of information. To do this, we conducted an ANOVA and pairwise t-tests to determine differences in reliance between different semantic levels and preference categories. An example comparing the different semantic levels is shown below.
+
+```
+
+# first, conduct the anova
+anova_levels_h2cd <- aov(h2cd$takeawayInfoReliance ~ h2cd$semanticLevel)
+summary(anova_levels_h2cd)
+
+# then, pairwise t-test
+pairwise.t.test(h2cd$takeawayInfoReliance, h2cd$semanticLevel, p.adjust.method = "bonf")
 
 
+```
+
+# Research Question 3
+
+** How does the placement of text affect how the reader integrates the text with the chart?**
+
+We used logistic regressions, as in RQ2, to determine predicting factors for the elicitation of each semantic level in a takeaway, this time focusing on position as the factor of interest. We compare the likelihood of a participant making a takeaway in the semantic level of the section (e.g., `isTakeawayL1`) when the annotation is positioned at a reference level (e.g., title) in comparison to the other positions. For this question, we are only interested in how the different positions compare to the title position, not to each other. An example for L1 is shown below.
+
+```
+
+position_L1 <- glm(formula = isTakeawayL1 ~ as.factor(annotationPosition), family = binomial(link = "logit"), data = h3)
+summary(position_L1)
+Anova(position_L1)
+exp(coef(position_L1))
+
+```
+
+# End
+
+This concludes the example analysis for "Striking a Balance: Reader Takeaways and Preferences when Integrating Text and Charts". Further analysis can be found in [balanceText.Rmd](data_analysis/balanceText.Rmd). Contact [Chase Stokes](mailto:cstokes@ischool.berkeley.edu) with any questions or requests for additional materials.
