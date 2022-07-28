@@ -2,7 +2,7 @@
 
 _Chase Stokes ([cstokes@ischool.berkeley.edu](mailto:cstokes@ischool.berkeley.edu))_<br>
 _Vidya Setlur ([vsetlur@tableau.com](mailto:vsetlur@tableau.com))_<br>
-_Bridget Cogley ([hwinds@gmail.com](mailto:hwinds@gmail.com))_<br>
+_Bridget Cogley ([bcogley@versalytix.com](mailto:bcogley@versalytix.com))_<br>
 _Arvind Satyanarayan ([arvindsatya@mit.edu](mailto:arvindsatya@mit.edu))_<br>
 _Marti Hearst ([hearst@berkeley.edu](mailto:hearst@berkeley.edu))_<br>
 
