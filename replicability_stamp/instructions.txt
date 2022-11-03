@@ -1,7 +1,7 @@
 There are programs which need to be downloaded in order to compile and run the code in script.Rmd.
 First, download R from https://cran.r-project.org/ . Select the proper precompiled binary distribution of the base systems and contribued packages (Linux, MacOS, Windows). Follow on-screen instructions and accept default settings provided by the installer.
 If the Windows version of R has been downloaded, download Rtools from https://cran.r-project.org/bin/windows/Rtools/ . This will allow packages to compile, which is necessary to run the analysis.  Follow on-screen instructions and accept default settings provided by the installer.
-Finally, download RStudio from https://www.rstudio.com/products/rstudio/download/#download . Select the proper link from the set of OS.  Follow on-screen instructions and accept default settings provided by the installer.
+Finally, download RStudio Desktop from https://www.rstudio.com/products/rstudio/download/#download . Select the proper link from the set of OS.  Follow on-screen instructions and accept default settings provided by the installer.
 
-When the programs are downloaded, open and run script.Rmd in RStudio. In the upper right corner of the "Source" pane (located by default in the upper left pane in the view), select the dropdown arrow on the right of the "Run" button. Select "Run All" at the bottom of the dropdown menu.
-The script will automatically check for packages and download those which are required, which will be compiled by Rtools or may need permission for MacOS users. Grant permission or enter password when promoted. 
+When the programs are downloaded, open and run script.Rmd in RStudio Desktop. In the upper right corner of the "Source" pane (located by default in the upper left pane in the view), select the dropdown arrow on the right of the "Run" button. Select "Run All" at the bottom of the dropdown menu.
+The script will automatically check for packages and download those which are required, which will be compiled by Rtools or may need permission for MacOS users. Grant permission or enter password when prompted. 
