@@ -9,17 +9,23 @@ This file contains a script to process this data and replicate one of the figure
 
 ```{r}
 
-packages = c("tidyverse", "ggplot2", "plyr", "car", "lme4", "stringr", "ggpubr", "PMCMRplus", "irr", "plotrix")
+packages = c("tidyverse", "PMCMRplus")
 
-package.check <- lapply(
-  packages,
-  FUN = function(x) {
-    if (!require(x, character.only = TRUE)) {
-      install.packages(x, dependencies = TRUE)
-      library(x, character.only = TRUE)
-    }
-  }
-)
+# package.check <- lapply(
+#   packages,
+#   FUN = function(x) {
+#     if (!require(x, character.only = TRUE)) {
+#       install.packages(x, dependencies = TRUE)
+#       library(x, character.only = TRUE)
+#     }
+#   }
+# )
+
+install.packages(setdiff(packages, rownames(installed.packages())), dependencies = TRUE)
+
+library(tidyverse)
+library(PMCMRplus)
+
 
 ### load and clean data
 
@@ -98,4 +104,4 @@ as.table(table_data)
 
 ```
 
-Coloring was added through LaTeX, not through R. THe values are repliated. 
+Coloring was added through LaTeX, not through R. The values are replicated. 
